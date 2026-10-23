@@ -63,7 +63,48 @@ select, input:not([type="radio"]):not([type="checkbox"]), textarea {
 }
 </style>
 
-</head><body><header><div class="header"><div><h1 id="platformHeading">Assessment Platform</h1><div class="sub" id="platformSubheading"></div></div><div class="badge" id="platformBadge">ASSESSMENT PLATFORM</div></div></header><main>
+
+<style id="icap-student-auth-style">
+#icapAuthShell{max-width:760px;margin:26px auto;padding:0 16px}
+#icapAuthCard{background:#fff;border:1px solid #dbe4ef;border-radius:18px;padding:24px;box-shadow:0 8px 28px #06264a0c}
+#icapAuthCard h2{color:#06264a;margin:0 0 8px}
+#icapAuthCard .auth-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+#icapAuthCard label{display:block;font-size:11px;text-transform:uppercase;font-weight:800;color:#52647a;margin:12px 0 6px}
+#icapAuthCard input{width:100%;padding:12px;border:1px solid #ccd8e6;border-radius:10px;font:inherit;background:#fff}
+#icapAuthCard button{font:inherit;border:0;border-radius:10px;padding:11px 14px;font-weight:800;cursor:pointer}
+#icapAuthCard .auth-primary{background:#0b5cad;color:#fff;width:100%;margin-top:14px}
+#icapAuthCard .auth-secondary{background:#eef5fc;color:#124b7d}
+#icapAuthMessage{margin-top:12px;padding:11px;border-radius:10px;font-size:13px;line-height:1.5;display:none;white-space:pre-wrap}
+#icapAuthMessage.error{display:block;background:#fff0ef;color:#9e2117;border:1px solid #fecdca}
+#icapAuthMessage.success{display:block;background:#eaf8f2;color:#086344;border:1px solid #b7e4d1}
+#icapAuthButtons{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+#icapAuthStatus{font-size:12px;color:#64748b;margin-top:12px;overflow-wrap:anywhere}
+#icapLogoutBar{display:none;max-width:1400px;margin:0 auto;padding:8px 16px;justify-content:flex-end;align-items:center;gap:12px}
+#icapLogoutBar button{border:1px solid #dbe4ef;background:#fff;color:#124b7d;border-radius:9px;padding:8px 12px;font-weight:700;cursor:pointer}
+@media(max-width:600px){#icapAuthCard .auth-grid{grid-template-columns:1fr}#icapAuthCard{padding:18px}}
+</style>
+
+</head><body><header><div class="header"><div><h1 id="platformHeading">Assessment Platform</h1><div class="sub" id="platformSubheading"></div></div><div class="badge" id="platformBadge">ASSESSMENT PLATFORM</div></div></header>
+<div id="icapAuthShell">
+  <section id="icapAuthCard" aria-labelledby="icapAuthTitle">
+    <h2 id="icapAuthTitle">ICAP Student Account</h2>
+    <p class="muted">Create your student account or sign in with your registered email and password to access the assessment platform.</p>
+    <div class="auth-grid">
+      <div><label for="icapAuthEmail">Email address</label><input id="icapAuthEmail" type="email" autocomplete="email" placeholder="student@example.com" required></div>
+      <div><label for="icapAuthPassword">Password</label><input id="icapAuthPassword" type="password" autocomplete="current-password" minlength="8" placeholder="At least 8 characters" required></div>
+    </div>
+    <div id="icapAuthButtons">
+      <button type="button" class="auth-primary" id="icapLoginBtn" style="flex:1">Student Login</button>
+      <button type="button" class="auth-secondary" id="icapRegisterBtn" style="flex:1">Create Account</button>
+    </div>
+    <div id="icapAuthButtons2" style="margin-top:9px"><button type="button" class="auth-secondary" id="icapResetBtn">Forgot password?</button></div>
+    <div id="icapAuthMessage" role="status" aria-live="polite"></div>
+    <div id="icapAuthStatus">Registration may require email confirmation. Use your own email address and never share your password.</div>
+  </section>
+</div>
+<div id="icapLogoutBar"><span id="icapSignedInAs" class="muted"></span><button type="button" id="icapLogoutBtn">Log out</button></div>
+
+<main id="icapMain" style="display:none">
 <div class="capacity-badge" title="Architecture target: 1,000,000 concurrent students">
   ICAP • 1,000,000-Student Capacity Target
 </div>
@@ -829,11 +870,6 @@ function idbSaveAllBanks(){
     tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);
   }));
 }
-function saveConfig(){
-  const meta={...CONFIG,banks:{}};
-  localStorage.setItem(STORE_KEY,JSON.stringify(meta));
-  idbSaveAllBanks().catch(()=>{});
-}
 function loadConfig(){
   try{
     const x=JSON.parse(localStorage.getItem(STORE_KEY)||"null");
@@ -894,7 +930,15 @@ function refreshStudentSubjects(){
   else if(subjects.length) el.value=subjects[0];
 }
 function bankKey(g,s){return encodeURIComponent(g+"__"+s)}
-function saveConfig(){localStorage.setItem(STORE_KEY,JSON.stringify(CONFIG))}
+// Persist small settings in localStorage and full question banks in IndexedDB.
+// This avoids localStorage quota errors and keeps saved banks separate from UI settings.
+function saveConfig(){
+  try {
+    const meta={...CONFIG,banks:{}};
+    localStorage.setItem(STORE_KEY,JSON.stringify(meta));
+  } catch(e) { console.warn("ICAP settings could not be saved to local storage:",e); }
+  idbSaveAllBanks().catch(e=>console.warn("ICAP question banks could not be saved to IndexedDB:",e));
+}
 function inferTopicFromQuestion(q,sem){
   const id=String(q.id||"");
   if(CONFIG.activeGrade==="Grade 9" && CONFIG.activeSubject==="Physics"){
@@ -1149,8 +1193,164 @@ const ICAP_MATH_S1={"Grade 9":icapBuildMathS1("Grade 9"),"Grade 10":icapBuildMat
 for(const g of ["Grade 9","Grade 10"]){BUILTIN_OMAN_MATH[g].sem1=ICAP_MATH_S1[g].practice;BUILTIN_OMAN_MATH[g].exam1=ICAP_MATH_S1[g].exam;BUILTIN_OMAN_MATH[g].theory1=ICAP_MATH_S1[g].theory;BUILTIN_OMAN_MATH[g].topics=ICAP_MATH_S1[g].topics;}
 
 
+
+/* ICAP Biology Grade 11 curriculum banks */
+const ICAP_BIO11_TOPICS1=["Cells as the basic units of living organisms", "Carbohydrates and lipids", "Proteins and water", "Mode of action of enzymes", "Factors that affect enzyme action", "Fluid mosaic membranes", "Movement of substances into and out of cells", "Replication and division of nuclei and cells", "Chromosome behavior in mitosis"];
+const ICAP_BIO11_TOPICS2=["Structure of transport tissues", "Transport mechanisms", "The circulatory system", "The heart", "The gas exchange system", "Infectious diseases", "Antibiotics", "The immune system", "Antibodies and vaccination"];
+const ICAP_BIO11_FACTS={"Cells as the basic units of living organisms":[["cell membrane","controls movement of substances into and out of the cell","cell wall","cytoplasm","nucleus"],["nucleus","contains most of the cell's genetic material","ribosome","vacuole","cell membrane"],["ribosome","site of protein synthesis","mitochondrion","Golgi apparatus","lysosome"],["mitochondrion","site of aerobic respiration and ATP production","ribosome","cell wall","chloroplast"],["chloroplast","contains chlorophyll and is the site of photosynthesis in plant cells","mitochondrion","nucleus","rough endoplasmic reticulum"],["cell wall","supports and strengthens plant cells","cell membrane","nuclear envelope","cytoplasm"],["large permanent vacuole","contains cell sap and helps maintain turgor in many plant cells","nucleolus","ribosome","centriole"],["cytoplasm","where many metabolic reactions take place","cell wall","chromosome","cellulose"],["specialised cell","has features adapted to a particular function","identical cell","organelle-free cell","non-living tissue"],["resolution","ability to distinguish two close points as separate","magnification","contrast","field of view"]],"Carbohydrates and lipids":[["glucose","a monosaccharide and a common respiratory substrate","amino acid","fatty acid","nucleotide"],["starch","a storage polysaccharide in plants","animal storage polysaccharide","structural protein","membrane phospholipid"],["glycogen","a storage polysaccharide in animals","plant cell-wall polymer","disaccharide","enzyme"],["cellulose","a structural polysaccharide in plant cell walls","animal storage carbohydrate","triglyceride","amino acid chain"],["sucrose","a disaccharide made from glucose and fructose","monosaccharide","polypeptide","fatty acid"],["iodine solution","a reagent used to test for starch","Biuret reagent","ethanol emulsion test","Benedict's solution alone"],["Benedict's test with heating","a test for reducing sugars","test for proteins","test for lipids","test for starch"],["triglyceride","made from glycerol and three fatty acids","made from glucose monomers","made from amino acids","made from nucleotides"],["phospholipid","has a hydrophilic phosphate head and hydrophobic fatty-acid tails","has only hydrophilic regions","is a polysaccharide","is a nucleic acid"],["lipid","a long-term energy store with high energy content per gram","the main catalyst in cells","the genetic information molecule","the main solvent in cells"]],"Proteins and water":[["amino acid","the monomer used to build polypeptides","monosaccharide","fatty acid","nucleotide"],["peptide bond","links amino acids in a polypeptide","glycosidic bond","ester bond","hydrogen bond between water molecules"],["primary structure","the amino-acid sequence of a polypeptide","the number of cells","the shape of a membrane","the concentration of glucose"],["denaturation","loss of a protein's normal three-dimensional structure","DNA replication","water evaporation","lipid hydrolysis"],["Biuret reagent","turns lilac/purple in the presence of protein","tests for starch","tests for lipids","tests for oxygen"],["cohesion","attraction between water molecules","water's inability to dissolve ions","breakdown of proteins","movement of solutes through a membrane"],["high specific heat capacity","helps water resist rapid temperature change","makes water non-polar","means water cannot dissolve salts","causes water to have no surface tension"],["solvent","water dissolves many ionic and polar substances","water is always a catalyst","water stores genetic information","water is a lipid"],["hydrogen bonding","contributes to water's cohesion and thermal properties","forms peptide bonds","stores energy in triglycerides","replicates chromosomes"],["tertiary structure","the overall three-dimensional folding of one polypeptide chain","the sequence of nucleotides","the number of tissues","the order of phospholipids"]],"Mode of action of enzymes":[["active site","region where a substrate binds","site where DNA is stored","cell-wall pore","phospholipid tail"],["substrate","molecule on which an enzyme acts","product of photosynthesis only","a type of organelle","a membrane carbohydrate"],["enzyme-substrate complex","temporary complex formed when substrate binds to enzyme","permanent bond between two enzymes","a chromosome pair","a lipid bilayer"],["activation energy","energy barrier that enzymes lower","energy stored only in starch","temperature of the cytoplasm","mass of the substrate"],["specificity","results largely from complementary shape and chemical properties of active site and substrate","means every enzyme acts on every substrate","means enzymes are consumed","means enzymes work only at 100°C"],["products","molecules formed from the substrate during a reaction","molecules that always inhibit enzymes","the active site itself","the enzyme's amino-acid sequence only"],["induced fit","model in which active-site shape adjusts as substrate binds","model of chromosome separation","model of osmosis","model of lipid digestion"],["catalyst","increases reaction rate without being used up overall","is permanently consumed","always increases product energy","changes the reaction's equilibrium position"],["enzyme","usually a biological catalyst made of protein","a carbohydrate storage polymer","a membrane channel only","a type of chromosome"],["enzyme-substrate collisions","must occur for enzyme-catalysed reaction to proceed","are never needed","always destroy the enzyme","occur only in boiling water"]],"Factors that affect enzyme action":[["temperature","increases kinetic energy up to the enzyme's optimum, then high heat may denature it","has no effect on any enzyme","always decreases collisions","changes amino acids into glucose"],["optimum temperature","temperature at which an enzyme's measured rate is highest under stated conditions","temperature at which all enzymes denature","freezing point of every substrate","temperature at which collisions stop"],["pH","can alter charges and active-site structure","affects only the colour of enzymes","cannot affect proteins","always raises reaction rate"],["substrate concentration","can increase rate until active sites are largely occupied","always decreases rate","denatures every enzyme","changes enzyme into substrate"],["enzyme concentration","can increase rate when sufficient substrate is available","always lowers rate","has no effect under any condition","changes pH to 7"],["denaturation","disruption of the protein's functional shape","increase in substrate concentration","formation of more enzyme-substrate collisions only","reversible binding in every case"],["control variable","factor kept constant for a fair comparison","the result measured","the factor deliberately changed","the final conclusion"],["initial rate","rate measured near the start before conditions change substantially","total mass of enzyme","the final pH only","the temperature after the experiment"],["repeat trials","help identify anomalies and improve reliability","guarantee there is no systematic error","replace the need for controls","change the independent variable"],["limiting factor","factor in shortest supply relative to requirements that restricts the rate","a factor that can never change","always the enzyme itself","a factor unrelated to reaction rate"]],"Fluid mosaic membranes":[["phospholipid bilayer","forms the basic structure of cell membranes","forms the chromosome backbone","stores starch","makes up cellulose cell walls"],["hydrophilic head","faces watery environments on either side of the membrane","faces only the hydrophobic core","is made of DNA","forms the active site of every enzyme"],["hydrophobic tails","face inward away from water in the bilayer","face outward into water only","are carbohydrate chains","are channels made of protein"],["integral protein","is embedded in or spans the membrane","is found only in the nucleus","is a starch granule","is a cellulose fibre"],["channel protein","provides a hydrophilic pathway for particular ions or polar substances","uses ATP for every movement","forms a lipid droplet","replicates DNA"],["carrier protein","binds a particular substance and changes shape to move it across a membrane","is the same as cellulose","is always open to every solute","forms the cell wall"],["cholesterol","helps regulate membrane fluidity in animal cell membranes","is the main genetic material","forms peptide bonds","is the substrate for all enzymes"],["glycoprotein","can function in cell recognition and signalling","stores glucose as starch","makes ATP directly","is a chromosome"],["fluid mosaic model","describes proteins embedded in a laterally fluid lipid bilayer","describes a rigid cellulose sheet","describes the structure of DNA only","describes the stages of mitosis"],["selective permeability","allows some substances to cross more readily than others","allows all substances to cross equally","prevents all water movement","means the membrane is made only of protein"]],"Movement of substances into and out of cells":[["diffusion","net movement of particles from higher to lower concentration","movement only using ATP","movement of water only through a partially permeable membrane","bulk movement of blood"],["osmosis","net movement of water through a partially permeable membrane from higher water potential to lower water potential","movement of all solutes against a gradient","movement of particles using vesicles only","random movement with no net water transfer"],["active transport","movement against a concentration gradient using energy and membrane transport proteins","movement down a gradient without energy","water movement through cellulose only","movement of air through lungs"],["facilitated diffusion","passive movement down a gradient through a channel or carrier protein","movement against a gradient using ATP","movement of whole cells","DNA replication"],["concentration gradient","difference in concentration between two regions","the mass of a cell","the width of a chromosome","the pH of pure water"],["partially permeable membrane","allows some molecules to pass but restricts others","allows every molecule through freely","allows no molecule through","is always a cell wall"],["turgid plant cell","has gained water and its contents press against the cell wall","has lost all cytoplasm","has no membrane","has undergone meiosis"],["plasmolysis","when a plant cell loses water and the cell membrane pulls away from the wall","when a cell gains water and bursts","when chromosomes replicate","when a protein is translated"],["surface-area-to-volume ratio","influences how efficiently a cell exchanges materials","determines the number of chromosomes directly","is always greatest in the largest cells","does not affect exchange"],["equilibrium","particles continue moving but there is no net diffusion when concentrations are equal","all particle motion stops","ATP is always required","all molecules disappear"]],"Replication and division of nuclei and cells":[["DNA replication","produces a copy of DNA before cell division","separates homologous chromosomes in every mitosis","forms the cell membrane only","breaks down all genes"],["interphase","includes growth and DNA replication before mitosis","is one of the four mitotic stages only","occurs after cytokinesis only","means chromosomes are permanently absent"],["mitosis","nuclear division that usually produces two genetically similar nuclei","produces four genetically different haploid nuclei","halves chromosome number in normal body cells","is protein synthesis"],["cytokinesis","division of the cytoplasm to form separate daughter cells","replication of DNA","pairing of homologous chromosomes","formation of a spindle"],["spindle fibres","help move chromosomes or chromatids during division","synthesise starch","make the cell wall in animals","copy DNA bases"],["chromosome","DNA associated with proteins carrying genes","a membrane-bound organelle for respiration","a carbohydrate polymer","a lipid molecule"],["daughter cells","cells formed after cell division","the original parent cells only","the substrates for enzymes","the products of photosynthesis only"],["cell cycle checkpoints","help regulate progression and can delay division if problems are detected","guarantee that mutations never occur","remove the need for DNA replication","occur only in bacteria"],["growth and repair","important roles of mitosis in multicellular organisms","roles exclusive to meiosis","processes that require chromosome number to halve","processes that never involve cell division"],["uncontrolled cell division","can contribute to tumour formation and cancer","always improves tissue function","is the purpose of antibiotics","is a form of osmosis"]],"Chromosome behavior in mitosis":[["prophase","chromosomes condense and the mitotic spindle begins to form","sister chromatids separate to opposite poles","chromosomes line up at the equator","cytoplasm finishes dividing"],["metaphase","chromosomes align at the cell equator","DNA replication occurs","nuclear DNA is translated","daughter cells are fully separated"],["anaphase","sister chromatids separate and move towards opposite poles","chromosomes first replicate","chromosomes align at the equator","the nuclear envelope is always newly formed"],["telophase","nuclear envelopes reform around chromosome sets and chromosomes begin to decondense","sister chromatids first separate","DNA replication starts","the cell first enters interphase"],["sister chromatids","replicated copies of a chromosome joined at the centromere before separation","homologous chromosomes from two parents","two unrelated cells","two separate genes"],["centromere","region where sister chromatids are joined and kinetochore structures form","site of aerobic respiration","cell-wall material","the membrane's hydrophilic head"],["equator","region where chromosomes align during metaphase","the outer surface of a cell wall","the centre of a mitochondrion","the site of protein synthesis"],["genetically similar daughter nuclei","normally result from accurate mitosis after DNA replication","always have half the parent chromosome number","always contain different genes","have no chromosomes"],["chromosome number","is maintained in daughter nuclei by mitosis in a normal diploid cell","is always doubled in each daughter nucleus","is halved in every mitosis","depends only on cell size"],["microscope observation","can be used to identify mitotic stages by chromosome arrangement","directly measures enzyme pH","proves all cells divide at the same rate","shows atoms individually with a light microscope"]],"Structure of transport tissues":[["xylem vessel","transports water and mineral ions and provides support","transports sugars from sources to sinks only","carries oxygen in red blood cells","produces antibodies"],["phloem sieve tube","transports assimilates such as sucrose","transports water only from roots","forms the epidermal wax layer","is the main gas-exchange surface"],["companion cell","supports sieve tube elements in phloem loading and maintenance","forms a hollow xylem vessel with no role in phloem","carries oxygen using haemoglobin","is a white blood cell"],["lignin","strengthens and waterproofs xylem vessel walls","is the main sugar transported in phloem","forms antibodies","is a respiratory pigment"],["sieve plate","has pores allowing movement between sieve tube elements","blocks all movement between phloem cells","is found only in xylem pits","is the heart's valve"],["root hair cell","increases surface area for water and mineral ion uptake","reduces root surface area","transports oxygen around the body","produces red blood cells"],["transpiration","loss of water vapour from plant aerial parts, mainly through stomata","movement of sucrose through phloem only","digestion of starch","blood clotting"],["stoma","pore that allows gas exchange and water vapour loss","a xylem vessel","a red blood cell","a heart valve"],["vascular bundle","contains transport tissues such as xylem and phloem","contains only epidermal cells","is a group of alveoli","is an antibody"],["xylem vessel element","is dead at maturity in typical flowering plants and forms a hollow water-conducting tube","has a nucleus and pumps sucrose actively","is a type of lymphocyte","is the main site of protein synthesis"]],"Transport mechanisms":[["transpiration pull","helps draw water upward through xylem as water evaporates from leaves","pulls sucrose down only","moves blood through veins","is caused by antibody binding"],["cohesion","attraction between water molecules helps maintain a continuous water column in xylem","breaks the water column at all times","moves sugar through sieve plates","is a type of active transport"],["adhesion","attraction between water and xylem walls","is attraction between identical chromosomes","is diffusion of oxygen into blood","is pumping by the heart"],["translocation","movement of assimilates in phloem between sources and sinks","loss of water vapour from leaves","transport of oxygen by haemoglobin only","movement of chromosomes during mitosis"],["source","plant region where assimilates are produced or released into transport, such as a photosynthesising leaf","region that always consumes more sugar than it exports","a heart chamber","a type of pathogen"],["sink","region where assimilates are used or stored, such as a growing root or fruit","site of oxygen loading onto haemoglobin only","the xylem wall","the active site of an enzyme"],["guard cells","change shape to regulate stomatal opening","form red blood cells","carry sucrose in sieve tubes","secrete antibodies"],["mineral ion uptake","may involve active transport when ions move against their concentration gradient","always occurs by osmosis","never requires membrane proteins","is identical to transpiration"],["root pressure","can contribute to upward water movement but does not usually explain all transpiration-stream movement in tall plants","is the only force moving water in all plants","is the pressure of blood in arteries","is the force separating chromatids"],["transpiration rate","can be affected by light intensity, temperature, humidity and air movement","is independent of environmental conditions","is determined only by leaf colour","always stops in daylight"]],"The circulatory system":[["double circulation","blood passes through the heart twice in one complete circuit in humans","blood passes through the heart once in two circuits","blood never enters the lungs","only occurs in plants"],["artery","carries blood away from the heart","always carries deoxygenated blood","carries blood towards the heart","has no muscular wall"],["vein","carries blood towards the heart","always carries oxygenated blood","carries blood away from the heart","has the thickest wall of all vessels"],["capillary","has a thin wall suited to exchange of substances with tissues","has a thick wall with no exchange","contains valves at every point","is a chamber of the heart"],["red blood cell","contains haemoglobin to transport oxygen","produces antibodies as its main function","forms the main clotting mesh","is the pathogen itself"],["plasma","transports dissolved substances including nutrients, hormones and carbon dioxide","is made only of haemoglobin","is the main site of mitosis","forms the xylem"],["platelets","help blood clot at damaged vessels","carry most oxygen","produce insulin","digest bacteria by photosynthesis"],["white blood cell","contributes to immune defence","transports most oxygen","forms the main blood pressure pulse","is a plant transport tissue"],["arteriole","can alter diameter to regulate blood flow into capillary beds","has no smooth muscle","is the same as an alveolus","transports phloem sap"],["blood pressure","is generally highest in arteries close to the heart","is always highest in capillaries","is zero throughout the circulation","does not depend on vessel resistance"]],"The heart":[["right ventricle","pumps deoxygenated blood to the lungs through the pulmonary artery","pumps oxygenated blood to the body through the aorta","receives blood from pulmonary veins","prevents all atrial contraction"],["left ventricle","pumps oxygenated blood into the aorta","pumps blood to the lungs","receives blood from vena cava","has a thinner wall than the right ventricle in humans"],["tricuspid valve","lies between the right atrium and right ventricle","lies between the left atrium and left ventricle","is at the aortic exit","is a valve in a vein in the leg"],["bicuspid/mitral valve","lies between the left atrium and left ventricle","lies between the right atrium and right ventricle","is found in the vena cava","opens the trachea"],["aorta","carries oxygenated blood from the left ventricle to the body","carries deoxygenated blood to the lungs","returns blood from the body to the right atrium","is a capillary"],["pulmonary artery","carries deoxygenated blood from the right ventricle to the lungs","carries oxygenated blood from the lungs to the heart","returns blood from the body","is a valve"],["coronary arteries","supply oxygenated blood to the heart muscle","drain air from the lungs","carry urine to the bladder","transport phloem sap"],["cardiac cycle","sequence of atrial and ventricular contraction and relaxation","the sequence of mitotic stages","the movement of water through xylem","the production of antibodies"],["valves","prevent backflow and help maintain one-way blood flow","create red blood cells","exchange gases directly with air","generate DNA"],["left ventricular wall","is thick because it must generate high pressure for systemic circulation","is thin because it pumps only to the lungs","has no muscle","is made of xylem"]],"The gas exchange system":[["alveoli","provide a large surface area for gas exchange in the lungs","filter blood in the kidneys","transport sucrose in plants","produce antibodies"],["thin alveolar wall","reduces diffusion distance for gases","increases diffusion distance","prevents oxygen diffusion","stops ventilation"],["moist alveolar surface","allows oxygen and carbon dioxide to dissolve before diffusing","makes diffusion impossible","stores haemoglobin","digests pathogens"],["ventilation","movement of air into and out of the lungs","movement of blood around the body","movement of sucrose through phloem","division of a nucleus"],["diaphragm contraction","flattens the diaphragm, increasing thoracic volume during inspiration","reduces thoracic volume during inspiration","closes all bronchioles","forces blood into the aorta"],["intercostal muscles","help move the ribs during breathing","are the main blood pigment","line the xylem vessels","produce antibodies"],["oxygen diffusion","occurs from alveolar air into blood when its partial pressure is higher in alveoli","always moves from blood into alveoli","requires active transport through all alveolar cells","does not depend on gradients"],["carbon dioxide","diffuses from blood into alveoli for exhalation when its partial pressure is higher in blood","is transported only as oxygenated haemoglobin","is not produced by respiration","cannot cross membranes"],["haemoglobin","binds oxygen reversibly in red blood cells","digests starch","forms alveolar walls","is a plant hormone"],["smoking","can damage cilia and alveolar surfaces and increase disease risk","improves gas exchange in every case","increases lung elasticity permanently","prevents all infections"]],"Infectious diseases":[["pathogen","organism or agent that causes disease","a type of antibody only","a healthy tissue cell","an antibiotic"],["virus","replicates only inside living host cells","is killed by all antibiotics","is a type of plant xylem","can reproduce independently like a typical bacterium"],["bacterium","a prokaryotic microorganism; some species cause disease","always has a nucleus","is always treated effectively with antibiotics","is a human antibody"],["transmission","spread of a pathogen between hosts or from a source","the production of ATP only","the breakdown of lipids","the division of chromosomes"],["vector","organism that transmits a pathogen between hosts","a type of antibiotic","a white blood cell nucleus","a plant cell wall"],["incubation period","time between infection and appearance of symptoms","time taken for antibiotics to expire","duration of mitosis","time needed for vaccination to cause immediate sterilising immunity"],["hygiene","can reduce transmission by removing or limiting pathogens","always cures established viral infections","causes antibiotic resistance","replaces all vaccination"],["isolation","separating infected people when appropriate to reduce transmission","increasing contact with susceptible people","stopping all immune responses","a type of enzyme assay"],["contaminated water","can transmit pathogens such as those causing cholera","prevents all gastrointestinal disease","is a vaccine","is an antibiotic"],["epidemiology","study of patterns, causes and control of disease in populations","study of chromosome alignment only","the synthesis of lipids","movement of water through membranes"]],"Antibiotics":[["antibiotic","drug that kills bacteria or inhibits their growth","drug that reliably kills every virus","antibody produced by a vaccine","enzyme in the stomach"],["viral infection","is not treated by antibiotics because antibiotics target bacterial structures or processes","always responds to penicillin","is a bacterial disease","can be cured by taking any antibiotic"],["antibiotic resistance","allows resistant bacteria to survive and reproduce during antibiotic exposure","means a person's body becomes immune to every disease","is caused only by cold weather","makes bacteria unable to reproduce"],["natural selection","can increase the frequency of resistant bacteria when susceptible bacteria are killed","always removes resistance genes","prevents bacterial mutation","is the same as vaccination"],["prescribed course","should be followed as directed by an appropriate health professional","should always be shared with family","should be stopped whenever symptoms first improve without guidance","should be used for every cough"],["overuse of antibiotics","increases selection pressure favouring resistant bacteria","prevents all future resistance","kills viruses selectively","has no effect on bacterial populations"],["bacterial culture and sensitivity testing","can help identify an effective antibiotic for a bacterial infection","is a vaccination method","measures lung volume","identifies chromosome stages"],["broad-spectrum antibiotic","acts against a range of bacterial types","acts only against viruses","is always safer than a narrow-spectrum drug","cannot affect normal bacteria"],["antibiotic stewardship","means using antibiotics responsibly to preserve effectiveness","means using antibiotics for every illness","means avoiding hygiene","means changing DNA by mitosis"],["bacterial cell wall","is a target of some antibiotics, such as penicillin","is present in human red blood cells","is the same as a viral envelope","is made of haemoglobin"]],"The immune system":[["phagocyte","white blood cell that engulfs and digests pathogens","cell that carries most oxygen","plant transport cell","bacterial toxin"],["phagocytosis","engulfment of pathogens by phagocytes","production of sucrose in leaves","DNA replication","movement of water through xylem"],["lymphocyte","white blood cell involved in specific immune responses","cell that transports oxygen","a platelet","a type of antibiotic"],["antigen","molecule or structure recognised by the immune system and capable of eliciting a response","a drug that kills all bacteria","the same as an antibody in every context","a type of red blood cell"],["inflammation","local response that can increase blood flow and recruit immune cells","always means a viral infection only","is the same as mitosis","prevents immune cells from arriving"],["memory cells","persist after an immune response and can enable a faster response on re-exposure","are used only to carry oxygen","destroy all body cells","are antibiotics"],["innate immunity","includes non-specific defences such as skin and phagocytes","is specific only to one antigen","requires prior vaccination in every case","is the same as passive immunity"],["specific immunity","involves targeted responses to particular antigens","acts identically against every pathogen without recognition","is performed by xylem","does not involve lymphocytes"],["skin","forms a physical barrier to pathogen entry","is the main site of antibody secretion","transports blood to lungs","is a pathogen"],["fever","can be part of the body's response to infection, but very high or persistent fever needs medical attention","always proves a bacterial infection","is caused only by antibiotics","prevents all immune activity"]],"Antibodies and vaccination":[["antibody","protein produced by plasma cells that binds specifically to an antigen","a drug that directly kills all pathogens","a type of red blood cell","a membrane phospholipid"],["antigen-antibody binding","depends on complementary molecular shape and chemical interactions","occurs randomly with every molecule equally","replicates DNA","is the same as osmosis"],["vaccination","exposes the immune system to an antigen or its instructions to develop protective immunity","always causes the full disease","provides identical immediate protection to every person","is an antibiotic course"],["primary immune response","response following first exposure to a particular antigen; it is usually slower","always faster than every secondary response","does not produce memory cells","is the same as blood clotting"],["secondary immune response","is often faster and stronger because memory cells remain","occurs only before the first exposure","does not involve lymphocytes","is a form of diffusion"],["herd protection","reduced transmission can indirectly protect some people who are not immune","means every person must be infected","means antibiotics kill viruses","is the same as individual antibody concentration"],["plasma cell","differentiated B lymphocyte that secretes antibodies","red blood cell that carries oxygen","cell that forms xylem","bacterial cell"],["active immunity","the person's immune system generates its own response and memory","antibodies are received ready-made only","always lasts exactly one day","does not involve antigens"],["passive immunity","protection from antibodies received from another source; it is usually temporary","requires the recipient to make all antibodies first","is always lifelong","is the same as antibiotic resistance"],["vaccine booster","additional dose that can strengthen or restore immune protection when recommended","an antibiotic used against viruses","a way to remove all memory cells","a type of pathogen"]]};
+function icapBuildBio11(){
+ const make=(topic,f,i,sem,v)=>{
+  const [term,meaning,w1,w2,w3]=f, category=["Knowing","Reasoning","Application"][(i+v)%3];
+  let question=v===0?`Which statement correctly describes ${term}?`:
+   category==="Application"?`A Grade 11 student investigates a process involving ${term}. Which interpretation is correct?`:
+   category==="Reasoning"?`Which explanation best accounts for the biological role of ${term}?`:`Which description should be matched with ${term}?`;
+  const opts=[meaning,w1,w2,w3],shift=(i*3+v*2)%4,options=opts.slice(shift).concat(opts.slice(0,shift));
+  return {id:`BIO11-${sem}-${String(ICAP_BIO11_TOPICS1.concat(ICAP_BIO11_TOPICS2).indexOf(topic)+1).padStart(2,"0")}-${String(i*2+v+1).padStart(3,"0")}`,topic,category,question,options,correct:meaning,explanation:`${term}: ${meaning}.`,diagram:""};
+ };
+ const build=(topics,sem)=>{const a=[];topics.forEach(t=>(ICAP_BIO11_FACTS[t]||[]).forEach((f,i)=>{a.push(make(t,f,i,sem,0),make(t,f,i,sem,1))}));return a};
+ const practice1=build(ICAP_BIO11_TOPICS1,"P1"),practice2=build(ICAP_BIO11_TOPICS2,"P2");
+ const exam1=practice1.map((q,i)=>({...q,id:"BIO11-E1-"+String(i+1).padStart(3,"0"),question:"Examination item: "+q.question}));
+ const theory1=[
+ ["Cells as the basic units of living organisms","Describe the functions of the cell membrane, nucleus, ribosomes and mitochondria.","Name each structure and accurately link it to its function."],
+ ["Cells as the basic units of living organisms","Explain the difference between magnification and resolution and why electron microscopes reveal smaller structures.","Define both terms and relate electron microscopy to resolving power."],
+ ["Carbohydrates and lipids","Describe tests for starch, reducing sugars and lipids and give positive results.","Iodine blue-black for starch; heated Benedict's forms a coloured precipitate for reducing sugars; ethanol emulsion test gives milky-white emulsion for lipids."],
+ ["Carbohydrates and lipids","Compare starch, glycogen, cellulose and triglycerides in structure and function.","Distinguish carbohydrate polymers, storage and structural roles, and triglyceride composition."],
+ ["Proteins and water","Explain how amino acids form polypeptides and how denaturation affects protein function.","Describe peptide bonds, folding and loss of functional shape."],
+ ["Proteins and water","Explain three properties of water important to living organisms.","Suitable properties include solvent action, cohesion, high specific heat capacity and high latent heat of vaporisation."],
+ ["Mode of action of enzymes","Explain enzyme specificity and catalysis using the active site and enzyme-substrate complex.","Include substrate binding, products and lowering activation energy."],
+ ["Mode of action of enzymes","Explain why enzymes can be reused and how they affect reaction rate.","Enzymes are catalysts, not used up overall, and lower activation energy."],
+ ["Factors that affect enzyme action","Design an experiment to test the effect of temperature on enzyme activity.","Identify independent/dependent variables, controls, repeats and measurement method."],
+ ["Factors that affect enzyme action","Explain how temperature, pH and substrate concentration affect enzyme activity.","Discuss optimum conditions, denaturation and saturation of active sites."],
+ ["Fluid mosaic membranes","Describe the fluid mosaic model and roles of phospholipids, proteins, cholesterol and glycoproteins.","Describe bilayer orientation, transport/signalling, fluidity and recognition."],
+ ["Fluid mosaic membranes","Explain selective permeability and the role of membrane proteins.","Link hydrophobic core to limited passage of polar substances and proteins to selective transport."],
+ ["Movement of substances into and out of cells","Compare diffusion, osmosis, facilitated diffusion and active transport.","Compare gradients, substances moved, membrane involvement and energy requirements."],
+ ["Movement of substances into and out of cells","Explain what happens when a plant cell is placed in a concentrated salt solution.","Water leaves by osmosis; vacuole/cytoplasm shrink; plasmolysis may occur."],
+ ["Replication and division of nuclei and cells","Describe interphase, mitosis and cytokinesis.","Include growth, DNA replication, chromosome movement and cytoplasmic division."],
+ ["Replication and division of nuclei and cells","Explain why DNA replication and cell-cycle regulation must be accurate.","Link genetic information, growth/repair, checkpoints and uncontrolled division."],
+ ["Chromosome behavior in mitosis","Describe chromosome behaviour in prophase, metaphase, anaphase and telophase.","State condensation/spindle formation, alignment, chromatid separation and nuclear reformation."],
+ ["Chromosome behavior in mitosis","A diploid cell has 12 chromosomes before mitosis. State the number in each daughter nucleus and explain.","Each daughter nucleus normally has 12 chromosomes; mitosis maintains chromosome number."],
+ ["Chromosome behavior in mitosis","Explain the roles of sister chromatids, centromeres and spindle fibres.","Describe replicated copies, joining region and movement to opposite poles."],
+ ["Cells as the basic units of living organisms","Explain how surface-area-to-volume ratio affects exchange and give one adaptation that improves it.","Relate exchange limits to cell size and provide a relevant adaptation."]
+ ].map((x,i)=>({id:"BIO11-T1-"+String(i+1).padStart(3,"0"),topic:x[0],question:x[1],model:x[2],rubric:["accurate biological terms","correct explanation","relevant example or application","clear response"]}));
+ const theory2=theory1.map((q,i)=>({...q,id:"BIO11-T2-"+String(i+1).padStart(3,"0"),topic:ICAP_BIO11_TOPICS2[i%ICAP_BIO11_TOPICS2.length]}));
+ return {practice1,practice2,exam1,exam2:practice2.map((q,i)=>({...q,id:"BIO11-E2-"+String(i+1).padStart(3,"0")})),theory1,theory2};
+}
+const ICAP_BIO11_BANKS=icapBuildBio11();
+
+/* ===== ICAP OFFLINE BANK RECOVERY =====
+   Supplies a starter bank only when a supported subject/semester is empty.
+   Existing teacher/imported questions are never deleted or replaced.
+   These are generated practice items, not a claim of official MOE exam questions.
+*/
+function icapFallbackTopics(subject,grade,semester){
+  const g=Number(String(grade).match(/\d+/)?.[0]||9);
+  const pools={
+    Physics:{
+      1:["Measurement and units","Motion","Forces","Energy","Heat","Light","Sound","Electricity"],
+      2:["Motion graphs","Forces and momentum","Work and energy","Thermal physics","Waves","Reflection and refraction","Electric circuits","Magnetism"],
+      3:["Kinematics","Dynamics","Work, energy and power","Momentum","Circular motion","Gravitational fields","Waves and oscillations","Electricity"],
+      4:["Electric fields","Capacitance","Current electricity","Magnetic fields","Electromagnetic induction","Alternating current","Quantum physics","Nuclear physics"]
+    },
+    Chemistry:{
+      1:["Particle model and states of matter","Atomic structure","Periodic table","Bonding","Formulae and equations","Acids and bases","Separation techniques","Chemical change"],
+      2:["Rates of reaction","Energy changes","Moles and stoichiometry","Redox","Electrolysis","Metals and reactivity","Organic chemistry","Water and air"],
+      3:["Atomic structure and periodicity","Chemical bonding","Moles and equations","Energetics","Equilibria","Acids and bases","Redox chemistry","Organic chemistry"],
+      4:["Equilibrium","Reaction kinetics","Electrochemistry","Acid-base equilibria","Organic synthesis","Spectroscopy","Transition metals","Chemical energetics"]
+    },
+    Biology:{
+      1:["Cells and organisation","Nutrition","Transport","Respiration","Reproduction","Ecology","Inheritance","Human health"],
+      2:["Cell structure","Enzymes","Plant nutrition","Human transport","Gas exchange","Coordination","Ecology","Inheritance"],
+      3:["Cell membranes and transport","Biological molecules","Enzymes","Cell division","Gas exchange","Transport systems","Genetics","Ecology"],
+      4:["Cell structure and function","Membrane transport","DNA and protein synthesis","Inheritance","Homeostasis","Evolution","Energy transfer","Ecosystems"]
+    },
+    Mathematics:{
+      1:["Number and place value","Four operations","Fractions and decimals","Measurement","Shapes and angles","Patterns","Data handling","Word problems"],
+      2:["Integers and fractions","Ratio and proportion","Algebraic expressions","Linear equations","Angles and polygons","Area and volume","Statistics","Probability"],
+      3:["Number and standard form","Algebra and equations","Graphs and functions","Geometry","Trigonometry","Sequences","Statistics","Probability"],
+      4:["Algebra and functions","Differentiation","Integration","Coordinate geometry","Trigonometry","Vectors","Statistics","Probability"]
+    }
+  };
+  const band=g<=4?1:g<=8?2:g===9?2:g===10?3:g===11?3:4;
+  const all=pools[subject]?.[band]||pools[subject]?.[4]||["Core concepts","Applications","Problem solving","Data interpretation"];
+  const offset=semester===2?Math.max(0,Math.floor(all.length/2)):0;
+  const chosen=[];
+  for(let i=0;i<all.length;i++) chosen.push(all[(i+offset)%all.length]);
+  return chosen;
+}
+function icapFallbackFact(subject,topic){
+  const facts={
+    Physics:{"Measurement and units":"Measurements require a numerical value and a unit.","Motion":"Speed is distance travelled divided by time taken.","Motion graphs":"The gradient of a distance-time graph represents speed.","Forces":"The resultant force determines the change in an object's motion.","Forces and momentum":"Momentum is the product of mass and velocity.","Work and energy":"Work done equals force multiplied by displacement in the force direction.","Work, energy and power":"Power is the rate at which work is done or energy is transferred.","Waves":"Wave speed equals frequency multiplied by wavelength.","Electric circuits":"In a series circuit, the current is the same through each component.","Current electricity":"Ohm's law states that voltage equals current multiplied by resistance at constant physical conditions.","Magnetic fields":"A magnetic field describes the region where a magnetic force can act.","Electromagnetic induction":"A changing magnetic flux can induce an electromotive force.","Nuclear physics":"Radioactive decay is random for an individual nucleus."},
+    Chemistry:{"Particle model and states of matter":"Particles in a gas are far apart and move randomly.","Atomic structure":"The proton number identifies the element.","Periodic table":"Elements in the same group have similar chemical properties because they have related outer-electron arrangements.","Bonding":"Ionic bonding is the electrostatic attraction between oppositely charged ions.","Formulae and equations":"A balanced chemical equation has the same number of each type of atom on both sides.","Acids and bases":"An acid produces hydrogen ions in aqueous solution.","Rates of reaction":"Increasing temperature usually increases reaction rate because particles have more kinetic energy.","Moles and stoichiometry":"The amount in moles equals mass divided by molar mass.","Redox":"Oxidation is loss of electrons and reduction is gain of electrons.","Electrolysis":"Electrolysis uses electrical energy to drive a non-spontaneous chemical change.","Organic chemistry":"A homologous series has the same functional group and general formula."},
+    Biology:{"Cells and organisation":"The cell is the basic structural and functional unit of living organisms.","Cell structure":"The cell membrane regulates movement of substances into and out of the cell.","Enzymes":"Enzymes are biological catalysts that lower activation energy.","Respiration":"Aerobic respiration releases energy from glucose using oxygen.","Photosynthesis":"Photosynthesis transfers light energy into chemical energy stored in organic molecules.","Inheritance":"Genes are sections of DNA that influence inherited characteristics.","Ecology":"An ecosystem includes organisms and the physical environment with which they interact.","Membrane transport":"Diffusion is the net movement of particles from higher to lower concentration."},
+    Mathematics:{"Number and place value":"Place value depends on the position of a digit in a number.","Four operations":"The order of operations is brackets, powers, multiplication or division, then addition or subtraction.","Fractions and decimals":"Equivalent fractions have the same value even when their numerators and denominators differ.","Linear equations":"The same operation must be applied to both sides of an equation to preserve equality.","Ratio and proportion":"A ratio compares quantities using the same units or converted units.","Graphs and functions":"A point on a graph satisfies the relationship represented by that graph.","Trigonometry":"For a right-angled triangle, sine is opposite divided by hypotenuse.","Differentiation":"A derivative gives the gradient of a function with respect to its variable.","Integration":"A definite integral can represent the signed area between a curve and the axis."}
+  };
+  return facts[subject]?.[topic] || `${topic} should be explained using the relevant scientific or mathematical principle and appropriate evidence.`;
+}
+function icapBuildFallbackQuestion(subject,grade,sem,topic,index,exam=false){
+  const g=Number(String(grade).match(/\d+/)?.[0]||9), fact=icapFallbackFact(subject,topic);
+  let question,correct,distractors,explanation=fact;
+  if(subject==="Mathematics"){
+    const a=3+(g*7+index*5+(sem*3))%29, b=2+(g*3+index*4+sem)%13;
+    if(g<=4){
+      const ans=a+b; question=`A student has ${a} items and receives ${b} more. How many items are there altogether?`; correct=String(ans); distractors=[String(ans+1),String(Math.max(0,ans-1)),String(a*b)]; explanation=`Add the quantities: ${a} + ${b} = ${ans}.`;
+    } else if(g<=8){
+      const ans=a*b; question=`Evaluate ${a} × ${b}.`; correct=String(ans); distractors=[String(ans+a),String(a+b),String(Math.max(0,ans-b))]; explanation=`Multiply ${a} by ${b} to obtain ${ans}.`;
+    } else {
+      const x=2+(index%7), y=3+(g%5), ans=x*y;
+      question=`Given f(x) = ${x}x + ${y}, what is f(${x})?`; correct=String(x*x+y); distractors=[String(x+y),String(x*x-y),String(x*y+y)]; explanation=`Substitute x = ${x}: f(${x}) = ${x}(${x}) + ${y} = ${x*x+y}.`;
+    }
+  } else {
+    const variants=[
+      {q:`Which statement about ${topic.toLowerCase()} is scientifically correct?`,a:fact,d:["It does not follow any measurable or testable principle.","It always has the same effect in every possible condition.","It can be explained without evidence or observations."]},
+      {q:`A student is reviewing ${topic.toLowerCase()}. Which conclusion is best supported by the relevant principle?`,a:fact,d:["The conclusion should be accepted without checking evidence.","Changing every variable at once always identifies cause and effect.","A scientific explanation does not need consistent observations."]},
+      {q:`Which explanation should a student use when describing ${topic.toLowerCase()}?`,a:fact,d:["A statement that contradicts the relevant principle.","A guess that cannot be checked by observation or calculation.","A claim that ignores the conditions of the situation."]}
+    ];
+    const v=variants[index%variants.length]; question=v.q; correct=v.a; distractors=v.d;
+  }
+  const opts=[correct,...distractors];
+  const shift=(index+g+sem)%opts.length; const rotated=opts.slice(shift).concat(opts.slice(0,shift));
+  return {id:`ICAP-FB-${subject.slice(0,3).toUpperCase()}-${g}-S${sem}-${exam?'E':'P'}-${String(index+1).padStart(3,'0')}`,topic,category:["Knowing","Application","Reasoning"][index%3],question,options:rotated,correct,explanation,diagram:""};
+}
+function icapBuildFallbackTheory(subject,grade,sem,topics){
+  return topics.slice(0,4).map((topic,i)=>({
+    id:`ICAP-FB-${subject.slice(0,3).toUpperCase()}-${String(grade).replace(/\D/g,'')}-S${sem}-T${i+1}`,
+    topic,category:["Knowing","Application","Reasoning","Application"][i],
+    question:subject==="Mathematics"?`Solve a problem involving ${topic.toLowerCase()}. Show each step, state the rule used, and check your answer.`:`Explain ${topic.toLowerCase()}, state the key principle, and apply it to a suitable example. Show your reasoning.`,
+    questionEn:subject==="Mathematics"?`Solve a problem involving ${topic.toLowerCase()}. Show each step, state the rule used, and check your answer.`:`Explain ${topic.toLowerCase()}, state the key principle, and apply it to a suitable example. Show your reasoning.`,
+    rubric:["Relevant concept or definition","Clear method and reasoning","Accurate application or example","Conclusion with units or evidence where appropriate"],
+    model:icapFallbackFact(subject,topic),answer:icapFallbackFact(subject,topic)
+  }));
+}
+function icapEnsureFallbackBank(grade,subject,bank){
+  if(!["Physics","Chemistry","Biology","Mathematics"].includes(subject)) return bank;
+  const g=Number(String(grade).match(/\d+/)?.[0]||0); if(!g) return bank;
+  bank.sem1=Array.isArray(bank.sem1)?bank.sem1:[]; bank.sem2=Array.isArray(bank.sem2)?bank.sem2:[];
+  bank.theory1=Array.isArray(bank.theory1)?bank.theory1:[]; bank.theory2=Array.isArray(bank.theory2)?bank.theory2:[];
+  const buildSem=(sem)=>{
+    const topics=icapFallbackTopics(subject,grade,sem);
+    const practice=[]; for(let i=0;i<Math.max(12,topics.length);i++) practice.push(icapBuildFallbackQuestion(subject,grade,sem,topics[i%topics.length],i,false));
+    const exam=[]; for(let i=0;i<Math.max(20,topics.length*2);i++) exam.push(icapBuildFallbackQuestion(subject,grade,sem,topics[i%topics.length],i,true));
+    return {topics,practice,exam,theory:icapBuildFallbackTheory(subject,g,sem,topics)};
+  };
+  if(!bank.sem1.length){const x=buildSem(1);bank.sem1=x.practice;bank.exam1=x.exam;bank.theory1=bank.theory1.length?bank.theory1:x.theory;}
+  if(!bank.sem2.length){const x=buildSem(2);bank.sem2=x.practice;bank.exam2=x.exam;bank.theory2=bank.theory2.length?bank.theory2:x.theory;}
+  if(!Array.isArray(bank.exam1)||!bank.exam1.length) bank.exam1=bank.sem1.slice();
+  if(!Array.isArray(bank.exam2)||!bank.exam2.length) bank.exam2=bank.sem2.slice();
+  if(!bank.theory1.length) bank.theory1=icapBuildFallbackTheory(subject,g,1,icapFallbackTopics(subject,grade,1));
+  if(!bank.theory2.length) bank.theory2=icapBuildFallbackTheory(subject,g,2,icapFallbackTopics(subject,grade,2));
+  const k=bankKey(grade,subject), old=CONFIG.topicsByBank[k]||{};
+  CONFIG.topicsByBank[k]={sem1:(old.sem1&&old.sem1.length)?old.sem1:icapFallbackTopics(subject,grade,1),sem2:(old.sem2&&old.sem2.length)?old.sem2:icapFallbackTopics(subject,grade,2)};
+  return bank;
+}
+
 function ensureActiveBank(){
   const k=bankKey(CONFIG.activeGrade,CONFIG.activeSubject);
+  if(CONFIG.activeGrade==="Grade 11" && CONFIG.activeSubject==="Biology"){
+    const bio=ICAP_BIO11_BANKS, prior=CONFIG.banks[k]||{};
+    const merge=(old,items)=>{const arr=Array.isArray(old)?old.slice():[],ids=new Set(arr.map(q=>q.id));for(const q of items)if(!ids.has(q.id)){arr.push(q);ids.add(q.id)}return arr};
+    CONFIG.banks[k]={...prior,sem1:merge((prior.sem1||[]).filter(q=>!String(q.id||"").startsWith("BIO11-")),bio.practice1),sem2:merge((prior.sem2||[]).filter(q=>!String(q.id||"").startsWith("BIO11-")),bio.practice2),exam1:bio.exam1,exam2:bio.exam2,theory1:bio.theory1,theory2:bio.theory2};
+    CONFIG.topicsByBank[k]={sem1:bio.practice1.map(q=>q.topic).filter((t,i,a)=>a.indexOf(t)===i),sem2:bio.practice2.map(q=>q.topic).filter((t,i,a)=>a.indexOf(t)===i)};
+  }
   if(!CONFIG.banks[k]){
     if(CONFIG.activeGrade==="Grade 9" && CONFIG.activeSubject==="Physics"){
       CONFIG.banks[k]={sem1:BUILTIN_PHYSICS.sem1,sem2:BUILTIN_PHYSICS.sem2,theory1:BUILTIN_PHYSICS.theory1,theory2:BUILTIN_PHYSICS.theory2};
@@ -1171,7 +1371,9 @@ function ensureActiveBank(){
       CONFIG.banks[k]={sem1:[],sem2:[],theory1:[],theory2:[]};
     }
   }
-  const b=CONFIG.banks[k];
+  let b=CONFIG.banks[k] && typeof CONFIG.banks[k]==="object" ? CONFIG.banks[k] : {sem1:[],sem2:[],theory1:[],theory2:[]};
+  b=icapEnsureFallbackBank(CONFIG.activeGrade,CONFIG.activeSubject,b);
+  CONFIG.banks[k]=b;
   if(CONFIG.activeSubject==="Mathematics" && ICAP_MATH_S2[CONFIG.activeGrade]){
     const m2=ICAP_MATH_S2[CONFIG.activeGrade];
     const ids=new Set((b.sem2||[]).map(q=>q.id));
@@ -1802,4 +2004,93 @@ async function bootstrap(){
   normalizeConfig(); Object.values(CONFIG.banks||{}).forEach(b=>[...(b.sem1||[]),...(b.sem2||[]),...(b.theory1||[]),...(b.theory2||[])].forEach(ensureQuestionSchema)); ensureActiveBank(); refreshIdentity(); applyLanguage(state.language||'en'); init();
 }
 bootstrap();
-</script></body></html>
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script id="icap-student-auth">
+(function(){
+  'use strict';
+  const SUPABASE_URL = 'https://cxelawxvjqdebdjmogke.supabase.co';
+  const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_0uodEFkX39d2xA_3tQvGnQ_AHYtL4u8';
+  const shell = document.getElementById('icapAuthShell');
+  const main = document.getElementById('icapMain');
+  const logoutBar = document.getElementById('icapLogoutBar');
+  const msg = document.getElementById('icapAuthMessage');
+  const emailEl = document.getElementById('icapAuthEmail');
+  const passEl = document.getElementById('icapAuthPassword');
+  const statusEl = document.getElementById('icapAuthStatus');
+  let client = null;
+  function message(text, kind){ msg.textContent=text; msg.className=kind||''; msg.style.display='block'; }
+  function clearMessage(){msg.textContent='';msg.className='';msg.style.display='none';}
+  function setBusy(b){['icapLoginBtn','icapRegisterBtn','icapResetBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=b;});}
+  function validInputs(requirePassword=true){
+    const email=(emailEl.value||'').trim(); const password=passEl.value||'';
+    if(!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){message('Enter a valid email address.','error');emailEl.focus();return false;}
+    if(requirePassword && password.length<8){message('Your password must contain at least 8 characters.','error');passEl.focus();return false;}
+    return true;
+  }
+  function showApp(user){
+    shell.style.display='none'; main.style.display=''; logoutBar.style.display='flex';
+    document.getElementById('icapSignedInAs').textContent='Signed in: '+(user.email||'student');
+  }
+  function showLogin(){shell.style.display='block';main.style.display='none';logoutBar.style.display='none';}
+  async function runAuth(action){
+    clearMessage();
+    if(!client){message('The secure login service could not load. Check your internet connection and try again.','error');return;}
+    if(action==='reset'){
+      if(!validInputs(false))return;
+      setBusy(true);
+      try{
+        const redirectTo=window.location.href.split('#')[0].split('?')[0];
+        const {error}=await client.auth.resetPasswordForEmail(emailEl.value.trim(),{redirectTo});
+        if(error)throw error;
+        message('If an account exists for this email, a password-reset link will be sent. Check your inbox and spam folder.','success');
+      }catch(e){message(e.message||'Password reset could not be requested.','error');}finally{setBusy(false);}return;
+    }
+    if(!validInputs(true))return;
+    setBusy(true);
+    const email=emailEl.value.trim(); const password=passEl.value;
+    try{
+      if(action==='register'){
+        const redirectTo=window.location.href.split('#')[0].split('?')[0];
+        const {data,error}=await client.auth.signUp({email,password,options:{emailRedirectTo:redirectTo}});
+        if(error)throw error;
+        if(data.session && data.user){showApp(data.user);message('Account created successfully.','success');}
+        else message('Registration submitted. Check your email and confirm your address before signing in. If the confirmation email does not arrive, check spam and your Supabase email settings.','success');
+      }else{
+        const {data,error}=await client.auth.signInWithPassword({email,password});
+        if(error)throw error;
+        if(data.user)showApp(data.user);
+        message('You are signed in to ICAP.','success');
+      }
+    }catch(e){message(e.message||'Authentication failed. Please check your details and try again.','error');}
+    finally{setBusy(false);}
+  }
+  async function init(){
+    if(!window.supabase || !window.supabase.createClient){statusEl.textContent='Login library did not load. Refresh this page or check whether your network blocks the authentication script.';showLogin();return;}
+    try{
+      client=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
+        auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+      });
+      document.getElementById('icapLoginBtn').addEventListener('click',()=>runAuth('login'));
+      document.getElementById('icapRegisterBtn').addEventListener('click',()=>runAuth('register'));
+      document.getElementById('icapResetBtn').addEventListener('click',()=>runAuth('reset'));
+      document.getElementById('icapLogoutBtn').addEventListener('click',async()=>{
+        const btn=document.getElementById('icapLogoutBtn');btn.disabled=true;
+        try{const {error}=await client.auth.signOut();if(error)throw error;showLogin();passEl.value='';clearMessage();message('You have logged out.','success');}
+        catch(e){message(e.message||'Could not log out. Please try again.','error');}
+        finally{btn.disabled=false;}
+      });
+      const {data,error}=await client.auth.getSession();
+      if(error)throw error;
+      if(data.session && data.session.user)showApp(data.session.user);else showLogin();
+      client.auth.onAuthStateChange((event,session)=>{
+        if(session && session.user)showApp(session.user);
+        else if(event==='SIGNED_OUT')showLogin();
+      });
+    }catch(e){showLogin();statusEl.textContent='Login setup error: '+(e.message||'Unknown error')+'. Check the Supabase project settings.';}
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+})();
+</script>
+
+</body></html>
